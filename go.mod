@@ -10,3 +10,5 @@ require (
 	k8s.io/client-go v2.0.0-alpha.0.0.20180621152933-b0722d92a7c1+incompatible
 
 )
+
+replace github.com/rancher/types v0.0.0-20181022213937-5d6bb759702c => /Users/rajashree/go-work/src/github.com/rancher/types

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/rancher/multi-cluster-app/api/globaldns"
+	"github.com/rancher/multi-cluster-app/api/multiclusterapp"
 	"github.com/rancher/norman/store/crd"
 	"github.com/rancher/norman/types"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
@@ -15,15 +16,22 @@ func Schemas(ctx context.Context, management *config.ManagementContext, schemas 
 	factory := &crd.Factory{ClientGetter: management.ClientGetter}
 
 	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &managementschema.Version,
-		client.GlobalDNSType)
+		client.GlobalDNSType,
+		client.MultiClusterAppType)
 
 	factory.BatchWait()
 
 	GlobalDNS(schemas)
+	MultiClusterApp(schemas)
 	return nil
 }
 
 func GlobalDNS(schemas *types.Schemas) {
 	schema := schemas.Schema(&managementschema.Version, client.GlobalDNSType)
 	schema.ListHandler = globaldns.DNSListHandler
+}
+
+func MultiClusterApp(schemas *types.Schemas) {
+	schema := schemas.Schema(&managementschema.Version, client.MultiClusterAppType)
+	schema.ListHandler = multiclusterapp.MCAppListHandler
 }

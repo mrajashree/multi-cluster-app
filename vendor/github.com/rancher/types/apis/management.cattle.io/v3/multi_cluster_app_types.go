@@ -61,8 +61,11 @@ type TargetStatus struct {
 type ClusterConfig struct {
 	Namespace                string `json:"namespace,omitempty"`
 	Server                   string `json:"server,omitempty" norman:"required"`
-	CertificateAuthorityPath string `json:"certificateAuthorityPath, omitempty"`
+	CertificateAuthorityPath string `json:"certificateAuthorityPath,omitempty"`
+	CertificateAuthorityData []byte `json:"certificateAuthorityData,omitempty"`
 	ClientCertificatePath    string `json:"clientCertificatePath,omitempty"`
+	ClientCertificateData    []byte `json:"clientCertificateData",omitempty`
 	ClientKeyPath            string `json:"clientKeyPath,omitempty"`
+	ClientKeyData            []byte `json:"clientKeyData",omitempty`
 	TokenFile                string `json:"tokenFile,omitempty"`
 }

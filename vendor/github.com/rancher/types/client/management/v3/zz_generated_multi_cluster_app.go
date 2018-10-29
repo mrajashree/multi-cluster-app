@@ -8,7 +8,7 @@ const (
 	MultiClusterAppType                      = "multiClusterApp"
 	MultiClusterAppFieldAnnotations          = "annotations"
 	MultiClusterAppFieldChartReference       = "chartReference"
-	MultiClusterAppFieldChartRepositoryURL   = "chartRepoUrl"
+	MultiClusterAppFieldChartRepositoryURL   = "chartRepositoryUrl"
 	MultiClusterAppFieldChartVersion         = "chartVersion"
 	MultiClusterAppFieldCreated              = "created"
 	MultiClusterAppFieldCreatorID            = "creatorId"
@@ -31,7 +31,7 @@ type MultiClusterApp struct {
 	types.Resource
 	Annotations          map[string]string      `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	ChartReference       string                 `json:"chartReference,omitempty" yaml:"chartReference,omitempty"`
-	ChartRepositoryURL   string                 `json:"chartRepoUrl,omitempty" yaml:"chartRepoUrl,omitempty"`
+	ChartRepositoryURL   string                 `json:"chartRepositoryUrl,omitempty" yaml:"chartRepositoryUrl,omitempty"`
 	ChartVersion         string                 `json:"chartVersion,omitempty" yaml:"chartVersion,omitempty"`
 	Created              string                 `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`

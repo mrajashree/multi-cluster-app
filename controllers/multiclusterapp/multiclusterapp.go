@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
@@ -16,17 +17,16 @@ import (
 
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
-	log "github.com/sirupsen/logrus"
+	//log "github.com/sirupsen/logrus"
 
-	"io/ioutil"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 const (
 	multiClusterAppController = "mgmt-multicluster-app-controller"
-	helmName                  = "rancherhelm"
-	tillerName                = "ranchertiller"
+	helmName                  = "helm"
+	tillerName                = "tiller"
 	base                      = 32768
 	end                       = 61000
 )
@@ -61,17 +61,12 @@ func (m MCAppController) sync(key string, app *v3.MultiClusterApp) error {
 		return nil
 	}
 
-	log.Infof("\nApp 1: %v\n", app)
-
 	// get the Helm Chart contents into a temp dir
 	if app.Spec.ChartRepositoryURL == "" {
 		return nil
 	}
 
-	log.Infof("\nApp: %#v\n", app)
-
 	for _, target := range app.Spec.Targets {
-		log.Infof("\nTarget: %#v\n", target)
 		config := target.Spec.ClusterConfig
 		kubeconfigPath, err := m.writeKubeConfig(config, app.Namespace)
 		if err != nil {
@@ -82,11 +77,9 @@ func (m MCAppController) sync(key string, app *v3.MultiClusterApp) error {
 		defer cancel()
 		addr := generateRandomPort()
 		probeAddr := generateRandomPort()
-		if app.Spec.ReleaseNamespace != "" {
-
-		}
+		fmt.Printf("\nkubeconfigPath: %v\n", kubeconfigPath)
 		go m.StartTiller(cont, addr, probeAddr, app.Spec.ReleaseNamespace, kubeconfigPath)
-		err = m.InstallChart(app, target)
+		err = m.InstallChart(app, target, addr)
 		if err != nil {
 			return err
 		}
@@ -124,25 +117,35 @@ func (m *MCAppController) writeKubeConfig(config v3.ClusterConfig, namespace str
 		},
 	}
 
-	log.Infof("Kubeconfig: %v", kubeConfig)
 	tempDir, err := ioutil.TempDir("", "kubeconfig-")
 	if err != nil {
 		return "", err
 	}
 
-	if err := os.MkdirAll(filepath.Join(tempDir, namespace), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(tempDir, ""), 0755); err != nil {
 		return "", err
 	}
-	kubeConfigPath := filepath.Join(tempDir, namespace, ".kubeconfig")
+	kubeConfigPath := filepath.Join(tempDir, "kubeconfig")
 	if err := clientcmd.WriteToFile(*kubeConfig, kubeConfigPath); err != nil {
 		return "", err
 	}
 	return kubeConfigPath, nil
 }
 
-func (m MCAppController) InstallChart(app *v3.MultiClusterApp, target v3.Target) error {
+func (m MCAppController) InstallChart(app *v3.MultiClusterApp, target v3.Target, port string) error {
 	var installCommand []string
-	installCommand = append([]string{"install", "--repo", app.Spec.ChartRepositoryURL, app.Spec.ChartReference})
+	var initCommand []string
+	initCommand = []string{"init", "--client-only"}
+	cm1 := exec.Command(helmName, initCommand...)
+	cm1.Env = []string{fmt.Sprintf("%s=%s", "HELM_HOME", ".helm")}
+	stderrBuf := &bytes.Buffer{}
+	cm1.Stdout = os.Stdout
+	cm1.Stderr = stderrBuf
+	err := cm1.Run()
+	if err != nil {
+		return fmt.Errorf("Error: %v, %v", err, stderrBuf.String())
+	}
+	installCommand = append([]string{"install", "--debug", "--repo", app.Spec.ChartRepositoryURL, app.Spec.ChartReference})
 
 	if app.Spec.ChartVersion != "" {
 		installCommand = append(installCommand, []string{"--version", app.Spec.ChartVersion}...)
@@ -160,12 +163,12 @@ func (m MCAppController) InstallChart(app *v3.MultiClusterApp, target v3.Target)
 	commands := make([]string, 0)
 	commands = append(installCommand, setValues...)
 	cmd := exec.Command(helmName, commands...)
-	stderrBuf := &bytes.Buffer{}
+	cmd.Env = []string{fmt.Sprintf("%s=%s", "HELM_HOST", "127.0.0.1:"+port)}
+	stderrBuf = &bytes.Buffer{}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = stderrBuf
 	if err := cmd.Start(); err != nil {
-		return err
-		//return fmt.Errorf("failed to install app %s. %s", obj.Name, stderrBuf.String())
+		return fmt.Errorf("failed to install app%s", stderrBuf.String())
 	}
 	if err := cmd.Wait(); err != nil {
 		// if the first install failed, the second install would have error message like `has no deployed releases`, then the
@@ -173,7 +176,7 @@ func (m MCAppController) InstallChart(app *v3.MultiClusterApp, target v3.Target)
 		if strings.Contains(stderrBuf.String(), "has no deployed releases") {
 			//return errors.New(v3.AppConditionInstalled.GetMessage(obj))
 		}
-		return fmt.Errorf("failed to install app: %v", err)
+		return fmt.Errorf("failed to install app: %v, %v", err, stderrBuf.String())
 		//return errors.Errorf("failed to install app %s. %s", obj.Name, stderrBuf.String())
 	}
 	return nil
